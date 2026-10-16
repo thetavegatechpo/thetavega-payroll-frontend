@@ -174,3 +174,53 @@
   .login-page .login-panel {animation:none!important;}
   .login-page .login-panel .primary.full {transition:none;}
 }
+.tv-brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.login-panel .tv-brand-logo {
+  width: 48px;
+  height: 48px;
+}
+
+/* =========================================================
+   SIDEBAR VIEWPORT FIX — preserve all existing page styles
+   ========================================================= */
+.shell > .sidebar {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.shell > .sidebar > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: #45616e transparent;
+}
+.shell > .sidebar > .sidebar-logo,
+.shell > .sidebar > .sidebar-footer {
+  flex-shrink: 0;
+}
+.shell > .sidebar > .sidebar-footer {
+  margin-top: auto;
+  background: #102b37;
+}
+/* Actual logo image at src/assets/logo.png, referenced in App.jsx */
+.sidebar-logo .tv-brand-logo,
+.login-panel .logo .tv-brand-logo {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.sidebar-logo .tv-brand-logo { width: 39px; height: 39px; }
+.login-panel .logo .tv-brand-logo { width: 48px; height: 48px; }

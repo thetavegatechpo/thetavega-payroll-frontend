@@ -2,7 +2,7 @@ import CompanySettings from "./CompanySettings.jsx";
 import UserManagement from "./UserManagement.jsx";
 import Payslips from "./Payslips.jsx";
 
-
+import logo from "./assets/logo.png";
 
 import PayrollPolicy from "./PayrollPolicy.jsx";
 
@@ -123,7 +123,11 @@ function Shell({ user, onLogout, children }) {
 
         <div className="sidebar-logo">
 
-          <span className="brand-icon">T</span>
+          <img
+  src={logo}
+  alt="Thetavega Logo"
+  className="tv-brand-logo"
+/>
 
           <div>
 
