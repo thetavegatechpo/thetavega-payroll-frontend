@@ -53,8 +53,13 @@ const initial = {
   esicWageCeiling: 21000,
 
   ptAmount: 200,
+  insuranceAmount: 0,
+  outstationFreeDays: 3,
+  outstationGrossPercent: 20,
 
   casualLeaveAccrual: 1,
+  earlyLeaveFreeCount: 2,
+  earlyLeavePenaltyPercent: 25,
 
   lateMarksPerPenalty: 1,
 
@@ -73,10 +78,11 @@ const emptyEligibility = {
   esic: false,
 
   pt: false,
+  insurance: false,
 
   tds: false,
 
-  tdsAmountPaise: 0,
+  tdsPercent: 0,
 
 };
 
@@ -373,12 +379,17 @@ export default function PayrollPolicy() {
 
           initial.esicWageCeiling,
 
+        insuranceAmount: latest.insuranceAmount ?? 0,
+        outstationFreeDays: latest.outstationFreeDays ?? 3,
+        outstationGrossPercent: latest.outstationGrossPercent ?? 20,
         ptAmount:
 
           latest.ptAmount ??
 
           initial.ptAmount,
 
+        earlyLeaveFreeCount: latest.earlyLeaveFreeCount ?? 2,
+        earlyLeavePenaltyPercent: latest.earlyLeavePenaltyPercent ?? 25,
         casualLeaveAccrual:
 
           latest.casualLeaveAccrual ??
@@ -507,13 +518,18 @@ export default function PayrollPolicy() {
 
               initial.esicWageCeiling,
 
-            ptAmount:
+            insuranceAmount: latest.insuranceAmount ?? 0,
+        outstationFreeDays: latest.outstationFreeDays ?? 3,
+        outstationGrossPercent: latest.outstationGrossPercent ?? 20,
+        ptAmount:
 
               latest.ptAmount ??
 
               initial.ptAmount,
 
-            casualLeaveAccrual:
+            earlyLeaveFreeCount: latest.earlyLeaveFreeCount ?? 2,
+        earlyLeavePenaltyPercent: latest.earlyLeavePenaltyPercent ?? 25,
+        casualLeaveAccrual:
 
               latest.casualLeaveAccrual ??
 
@@ -602,12 +618,13 @@ export default function PayrollPolicy() {
           esic: Boolean(data.esic),
 
           pt: Boolean(data.pt),
+          insurance: Boolean(data.insurance),
 
           tds: Boolean(data.tds),
 
-          tdsAmountPaise:
+          tdsPercent:
 
-            Number(data.tdsAmountPaise) || 0,
+            Number(data.tdsPercent) || 0,
 
         });
 
@@ -702,12 +719,17 @@ export default function PayrollPolicy() {
 
 
 
+        insuranceAmount: Number(form.insuranceAmount),
+        outstationFreeDays: Number(form.outstationFreeDays),
+        outstationGrossPercent: Number(form.outstationGrossPercent),
         ptAmount:
 
           Number(form.ptAmount),
 
 
 
+        earlyLeaveFreeCount: Number(form.earlyLeaveFreeCount),
+        earlyLeavePenaltyPercent: Number(form.earlyLeavePenaltyPercent),
         casualLeaveAccrual:
 
           Number(form.casualLeaveAccrual),
@@ -801,12 +823,13 @@ export default function PayrollPolicy() {
           esic: Boolean(elig.esic),
 
           pt: Boolean(elig.pt),
+          insurance: Boolean(elig.insurance),
 
           tds: Boolean(elig.tds),
 
-          tdsAmountPaise:
+          tdsPercent:
 
-            Number(elig.tdsAmountPaise) || 0,
+            Number(elig.tdsPercent) || 0,
 
         }
 
@@ -1036,6 +1059,9 @@ export default function PayrollPolicy() {
 
               <div className="pp-grid">
 
+                <Field label="Company Insurance / Month" value={form.insuranceAmount} suffix="₹" onChange={value=>update("insuranceAmount",value)}/>
+                <Field label="Outstation Free Days / Trip" value={form.outstationFreeDays} step="1" suffix="days" onChange={value=>update("outstationFreeDays",value)}/>
+                <Field label="Outstation Allowance" value={form.outstationGrossPercent} suffix="% of daily Gross" onChange={value=>update("outstationGrossPercent",value)}/>
                 <Field
 
                   label="Professional Tax"
@@ -1092,6 +1118,10 @@ export default function PayrollPolicy() {
 
 
 
+              <div className="pp-grid">
+                <Field label="Free Early Leaves / Month" value={form.earlyLeaveFreeCount} step="1" onChange={value=>update("earlyLeaveFreeCount",value)} suffix="times" />
+                <Field label="Early Leave Penalty" value={form.earlyLeavePenaltyPercent} onChange={value=>update("earlyLeavePenaltyPercent",value)} suffix="% of daily Gross" />
+              </div>
               <div className="pp-rules">
 
                 <div className="pp-rule">
@@ -1546,6 +1576,11 @@ export default function PayrollPolicy() {
 
                       {
 
+                        key: "insurance",
+                        title: "Company Insurance",
+                        description: "Employee premium when applicable",
+                      },
+                      {
                         key: "tds",
 
                         title: "Income Tax (TDS)",
@@ -1612,23 +1647,23 @@ export default function PayrollPolicy() {
 
                       <Field
 
-                        label="Approved Monthly TDS"
+                        label="Monthly TDS Rate"
 
                         value={
 
-                          elig.tdsAmountPaise / 100
+                          elig.tdsPercent
 
                         }
 
-                        suffix="₹"
+                        suffix="%"
 
                         onChange={(value) =>
 
                           updateEligibility(
 
-                            "tdsAmountPaise",
+                            "tdsPercent",
 
-                            Math.round(value * 100)
+                            value
 
                           )
 

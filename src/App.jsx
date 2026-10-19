@@ -1,3 +1,5 @@
+import SiteMaster from "./SiteMaster.jsx";
+import PayrollOperations from "./PayrollOperations.jsx";
 import CompanySettings from "./CompanySettings.jsx";
 import UserManagement from "./UserManagement.jsx";
 import Payslips from "./Payslips.jsx";
@@ -47,6 +49,7 @@ const mainNav = [
   ["/", "Dashboard", LayoutDashboard],
 
   ["/payroll", "Monthly Payroll", CalendarDays],
+  ["/site-attendance", "Site Attendance / TA", Building2],
 
   ["/payslips", "Payslips & Statements", FileText],
 
@@ -61,6 +64,7 @@ const mainNav = [
 const configurationNav = [
 
   ["/departments", "Departments", Building2],
+  ["/sites", "Site Master", Building2],
 
   ["/designations", "Designations", BriefcaseBusiness],
 
@@ -475,7 +479,7 @@ function Dashboard() {
   );
 }
 
-const employeeEmpty={firstName:"",lastName:"",email:"",mobile:"",department:"",designation:"",joiningDate:"",employmentType:"FULL_TIME",gender:"",dateOfBirth:""};
+const employeeEmpty={employeeNumber:"",firstName:"",lastName:"",email:"",mobile:"",department:"",designation:"",joiningDate:"",employmentType:"FULL_TIME",gender:"",dateOfBirth:""};
 
 
 
@@ -597,7 +601,7 @@ function Employees() {
 
     setEditId(e._id);
 
-    setForm({firstName:e.firstName||"",lastName:e.lastName||"",email:e.email||"",mobile:e.mobile||"",
+    setForm({employeeNumber:(e.employeeCode||"").replace(/^TT\/E\//, ""),firstName:e.firstName||"",lastName:e.lastName||"",email:e.email||"",mobile:e.mobile||"",
 
       department:e.department?._id||e.department||"",designation:e.designation?._id||e.designation||"",
 
@@ -616,6 +620,8 @@ function Employees() {
     try {
 
       const payload = {...form};
+
+      if (editId) delete payload.employeeNumber;
 
       if (!payload.dateOfBirth) delete payload.dateOfBirth;
 
@@ -751,6 +757,10 @@ function Employees() {
 
       .tv-emp-detail-grid strong{font-size:13px;color:#213b4f;word-break:break-word}
 
+      .tv-employee-id-entry{display:flex;align-items:stretch;gap:8px;width:100%}
+      .tv-employee-id-prefix{display:flex;align-items:center;justify-content:center;padding:0 15px;background:#fff3e7;color:#df7c25;border:1px solid #f4d6bd;border-radius:9px;font-size:13px;font-weight:800;white-space:nowrap}
+      .tv-employee-id-entry input{flex:1;min-width:0}
+      .tv-employee-id-entry input[readonly]{background:#f2f5f7;color:#64748b;cursor:not-allowed}
       @media(max-width:750px){.tv-emp-summary{grid-template-columns:1fr}.tv-emp-grid{grid-template-columns:repeat(auto-fill,minmax(215px,1fr))}.tv-emp-detail-grid{grid-template-columns:1fr}}
 
     `}</style>
@@ -856,6 +866,17 @@ function Employees() {
         <div className="modal-head"><div><span className="eyebrow">EMPLOYEE MASTER</span><h2>{editId?"Edit Employee":"New Employee"}</h2></div><button className="icon-btn" onClick={()=>setModal(false)}><X/></button></div>
 
         <form onSubmit={save}><div className="form-grid">
+
+          <label className="wide">Employee ID
+            <div className="tv-employee-id-entry">
+              <span className="tv-employee-id-prefix">TT/E/</span>
+              <input type="text" inputMode="numeric" pattern="[0-9]{1,5}" maxLength={5}
+                required={!editId} readOnly={Boolean(editId)}
+                placeholder="00001" value={form.employeeNumber || ""}
+                onChange={e=>setForm({...form,employeeNumber:e.target.value.replace(/\D/g,"").slice(0,5)})} />
+            </div>
+            <small>{form.employeeNumber ? `Saved ID: TT/E/${form.employeeNumber.padStart(5,"0")}` : "Enter the last 1–5 digits"}</small>
+          </label>
 
           {field("firstName","First name","text",true)}{field("lastName","Last name","text",true)}
 
@@ -1367,4 +1388,4 @@ function Settings(){const[rows,setRows]=useState([]),[values,setValues]=useState
 
 
 
-export default function App(){const[user,setUser]=useState(getUser);const navigate=useNavigate();function logout(){localStorage.removeItem("tv_payroll_token");localStorage.removeItem("tv_payroll_user");setUser(null);navigate("/login")}return <Routes><Route path="/login" element={user?<Navigate to="/"/>:<Login onLogin={setUser}/>}/><Route path="/*" element={!user?<Navigate to="/login"/>:<Shell user={user} onLogout={logout}><Routes><Route path="/" element={<Dashboard/>}/><Route path="/employees" element={<Employees/>}/><Route path="/departments" element={<Master type="departments"/>}/><Route path="/designations" element={<Master type="designations"/>}/><Route path="/salary-components" element={<Components/>}/><Route path="/salary-structures" element={<SalaryStructures/>}/><Route path="/payroll" element={<PayrollWorkspace/>}/><Route path="/payslips" element={<Payslips/>}/><Route path="/payroll-policy" element={<PayrollPolicy/>}/><Route path="/rules" element={<Rules/>}/><Route path="/settings" element={<CompanySettings/>}/><Route path="/users-access" element={["ADMIN", "SUPER_ADMIN"].includes(user?.role)?<UserManagement/>:<Navigate to="/"/>}/><Route path="*" element={<Navigate to="/"/>}/></Routes></Shell>}/></Routes>}
+export default function App(){const[user,setUser]=useState(getUser);const navigate=useNavigate();function logout(){localStorage.removeItem("tv_payroll_token");localStorage.removeItem("tv_payroll_user");setUser(null);navigate("/login")}return <Routes><Route path="/login" element={user?<Navigate to="/"/>:<Login onLogin={setUser}/>}/><Route path="/*" element={!user?<Navigate to="/login"/>:<Shell user={user} onLogout={logout}><Routes><Route path="/" element={<Dashboard/>}/><Route path="/employees" element={<Employees/>}/><Route path="/departments" element={<Master type="departments"/>}/><Route path="/sites" element={<SiteMaster/>}/><Route path="/designations" element={<Master type="designations"/>}/><Route path="/salary-components" element={<Components/>}/><Route path="/salary-structures" element={<SalaryStructures/>}/><Route path="/payroll" element={<PayrollWorkspace/>}/><Route path="/payroll-operations" element={<Navigate to="/salary-structures" replace/>}/><Route path="/site-attendance" element={<PayrollOperations initialTab="operations" mode="site"/>}/><Route path="/payslips" element={<Payslips/>}/><Route path="/payroll-policy" element={<PayrollPolicy/>}/><Route path="/rules" element={<Rules/>}/><Route path="/settings" element={<CompanySettings/>}/><Route path="/users-access" element={["ADMIN", "SUPER_ADMIN"].includes(user?.role)?<UserManagement/>:<Navigate to="/"/>}/><Route path="*" element={<Navigate to="/"/>}/></Routes></Shell>}/></Routes>}

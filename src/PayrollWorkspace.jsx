@@ -45,6 +45,7 @@ const initialAttendance = {
   weeklyOffDays: 0,
   holidayDays: 0,
   lateMarks: 0,
+  earlyLeaves: 0,
   halfDays: 0,
   approvedOverDays: 0,
 };
@@ -57,7 +58,7 @@ const attendanceFields = [
   {
     key: "casualLeaveDays",
     label: "Paid Casual Leave",
-    hint: "Included within total leaves",
+    hint: "Auto-applied: 1 paid CL after 20 equivalent days worked if any leave was taken",
   },
   {
     key: "weeklyOffDays",
@@ -75,6 +76,11 @@ const attendanceFields = [
     hint: "Each late mark = 0.25 day",
   },
   {
+    key: "earlyLeaves",
+    label: "Early Leaves",
+    hint: "First 2 free; from 3rd, 25% of daily Gross each. Exclude check-outs before 4 PM already counted as half-days.",
+  },
+  {
     key: "halfDays",
     label: "Half Days",
     hint: "Each half day = 0.50 day deduction",
@@ -88,18 +94,23 @@ const attendanceFields = [
 function calculateAttendance(year, month, a) {
   const calendarDays = daysInMonth(year, month);
   const totalLeaves = Number(a.totalLeaves);
-  const casualLeaveDays = Number(a.casualLeaveDays);
   const weeklyOffDays = Number(a.weeklyOffDays);
   const holidayDays = Number(a.holidayDays);
   const lateMarks = Number(a.lateMarks);
+  const earlyLeaves = Number(a.earlyLeaves || 0);
   const approvedOverDays = Number(a.approvedOverDays);
   const halfDays = Number(a.halfDays || 0);
-  const unpaidLeaveDays = totalLeaves - casualLeaveDays;
   const presentDays =
     calendarDays -
     totalLeaves -
     weeklyOffDays -
     holidayDays;
+  const workedEquivalentDays = presentDays - halfDays * 0.5;
+  // The one monthly CL is paid only against a leave already taken.
+  // It cannot add another day to the month or create a leave in the bank.
+  const casualLeaveDays = workedEquivalentDays >= 20 && totalLeaves >= 1
+    ? 1 : 0;
+  const unpaidLeaveDays = totalLeaves - casualLeaveDays;
   const latePenaltyDays = round2(lateMarks * 0.25);
   const halfDayPenaltyDays = round2(halfDays * 0.5);
   const totalDeductionDays = round2(
@@ -117,6 +128,7 @@ function calculateAttendance(year, month, a) {
     weeklyOffDays,
     holidayDays,
     lateMarks,
+    earlyLeaves,
     halfDays,
     approvedOverDays,
   ];
@@ -128,6 +140,12 @@ function calculateAttendance(year, month, a) {
     validationError = "Half days must be a whole number.";
   } else if (!Number.isInteger(lateMarks)) {
     validationError = "Late marks must be whole numbers.";
+  } else if (!Number.isInteger(earlyLeaves)) {
+    validationError = "Early leaves must be whole numbers.";
+  } else if (earlyLeaves > presentDays - halfDays) {
+    validationError = "Early leaves cannot exceed full attendance days (half-days excluded).";
+  } else if (casualLeaveDays > (workedEquivalentDays >= 20 ? 1 : 0)) {
+    validationError = "One paid casual leave requires 20 equivalent days worked this month.";
   } else if (casualLeaveDays > totalLeaves) {
     validationError =
       "Paid casual leave cannot exceed total leaves.";
@@ -152,8 +170,11 @@ function calculateAttendance(year, month, a) {
     totalLeaves,
     presentDays,
     paidLeaveDays: casualLeaveDays,
+    casualLeaveDays,
+    workedEquivalentDays,
     unpaidLeaveDays,
     latePenaltyDays,
+    earlyLeaves,
     halfDayPenaltyDays,
     totalDeductionDays,
     basePayableDays,
@@ -223,8 +244,6 @@ function Workflow({ current }) {
   const steps = [
     { label: "Attendance", icon: CalendarCheck2 },
     { label: "Calculate", icon: Calculator },
-    { label: "Review", icon: FileText },
-    { label: "Approval", icon: ShieldCheck },
     { label: "Payslip", icon: FileCheck2 },
   ];
   return (
@@ -290,12 +309,9 @@ export default function PayrollWorkspace() {
     () => calculateAttendance(year, month, attendance),
     [year, month, attendance]
   );
-  const periodStatus = period?.status || "NOT CREATED";
   const selectedEntry = entries.find(item => String(item.employee?._id || item.employee) === String(employee));
   const selectedStatus = selectedEntry?.status || "NOT_PROCESSED";
   const locked = ["PENDING_APPROVAL", "APPROVED"].includes(selectedStatus);
-  const canSubmit = Boolean(employee && selectedEntry && selectedStatus === "DRAFT");
-  const canApprove = Boolean(employee && selectedEntry && selectedStatus === "PENDING_APPROVAL");
   const statusLabel = (status) => ({
     NOT_PROCESSED: "Not processed", DRAFT: "Draft",
     PENDING_APPROVAL: "Pending approval", APPROVED: "Approved"
@@ -333,9 +349,7 @@ export default function PayrollWorkspace() {
         .includes(q)
     );
   });
-  const workflowCurrent = selectedStatus === "APPROVED" ? 4
-    : selectedStatus === "PENDING_APPROVAL" ? 3
-    : selectedEntry ? 2 : attendanceExists ? 1 : 0;
+  const workflowCurrent = selectedEntry ? 2 : attendanceExists ? 1 : 0;
   // =====================================================
   // LOAD DATA
   // =====================================================
@@ -415,6 +429,7 @@ export default function PayrollWorkspace() {
             saved.holidayDays || 0
           ),
             lateMarks: Number(saved.lateMarks || 0),
+            earlyLeaves: Number(saved.earlyLeaves || 0),
           halfDays: Number(saved.halfDays || 0),
           approvedOverDays: Number(
             saved.approvedOverDays || 0
@@ -467,10 +482,9 @@ export default function PayrollWorkspace() {
         unpaidLeaveDays: summary.unpaidLeaveDays,
         weeklyOffDays: Number(attendance.weeklyOffDays),
         holidayDays: Number(attendance.holidayDays),
-        casualLeaveDays: Number(
-          attendance.casualLeaveDays
-        ),
+        casualLeaveDays: summary.casualLeaveDays,
         lateMarks: Number(attendance.lateMarks),
+        earlyLeaves: Number(attendance.earlyLeaves),
         halfDays: Number(attendance.halfDays),
         approvedOverDays: Number(
           attendance.approvedOverDays
@@ -489,7 +503,7 @@ export default function PayrollWorkspace() {
       );
       const skipped = data.skipped || [];
       return (
-        `Payroll calculated for ${data.calculated || 0} employee(s).` +
+        `Payroll finalized for ${data.calculated || 0} employee(s).` +
         (skipped.length
           ? ` Skipped: ${skipped
               .map(
@@ -499,22 +513,6 @@ export default function PayrollWorkspace() {
               .join(", ")}`
           : "")
       );
-    });
-  }
-  function submitPayroll() {
-    action(async () => {
-      await api.post(
-        `/payroll/period/${year}/${month}/employee/${employee}/submit`
-      );
-      return "Selected employee payroll submitted for approval.";
-    });
-  }
-  function approvePayroll() {
-    action(async () => {
-      await api.post(
-        `/payroll/period/${year}/${month}/employee/${employee}/approve`
-      );
-      return "Selected employee payroll approved and locked.";
     });
   }
   // =====================================================
@@ -732,12 +730,13 @@ export default function PayrollWorkspace() {
                   type="number"
                   min="0"
                   step={
-                    ["lateMarks", "halfDays"].includes(field.key)
+                    ["lateMarks", "earlyLeaves", "halfDays"].includes(field.key)
                       ? "1"
                       : "0.25"
                   }
-                  value={attendance[field.key]}
+                  value={field.key === "casualLeaveDays" ? summary.casualLeaveDays : attendance[field.key]}
                   disabled={
+                    field.key === "casualLeaveDays" ||
                     !employee ||
                     loading ||
                     attendanceLoading ||
@@ -777,11 +776,15 @@ export default function PayrollWorkspace() {
                 />
                 <Detail
                   label="Paid Casual Leave"
-                  value={attendance.casualLeaveDays}
+                  value={summary.casualLeaveDays}
                 />
                 <Detail
                   label="Unpaid Leave"
                   value={summary.unpaidLeaveDays}
+                />
+                <Detail
+                  label="Early Leaves"
+                  value={`${summary.earlyLeaves} (first 2 free; further penalties deducted in ₹ at payroll calculation)`}
                 />
                 <Detail
                   label="Late Penalty"
@@ -893,78 +896,26 @@ export default function PayrollWorkspace() {
               <Calculator size={18} />
               {loading
                 ? "Processing..."
-                : "Calculate Selected Employee Payroll"}
+                : "Calculate & Finalize Employee Payroll"}
               <ChevronRight size={18} />
             </button>
           </section>
-          <section className="tw-panel">
-            <div className="tw-section-title">
-              <div>
-                <div className="tw-section-number">
-                  STEP 03 & 04
-                </div>
-                <h2>Review & Approval</h2>
-                <p>
-                  Submit and approve the selected employee payroll
-                </p>
-              </div>
-              <ShieldCheck
-                size={22}
-                className="tw-section-main-icon"
-              />
-            </div>
-            <div className="tw-approval-status">
-                <span className={`tw-approval-indicator ${selectedStatus === "APPROVED" ? "approved" : ""}`} />
-                <div>
-                  <strong>{employee ? `Employee Payroll: ${statusLabel(selectedStatus)}` : "Select an Employee"}</strong>
-                  <p>{selectedStatus === "APPROVED"
-                    ? "This employee's payroll is locked. Other employees can be processed."
-                    : selectedStatus === "PENDING_APPROVAL"
-                    ? "Awaiting admin approval for this employee."
-                    : "Save attendance, calculate, and submit this employee's payroll."}</p>
-                </div>
-              </div>
-              <div className="tw-approval-actions">
-              <button
-                className="tw-secondary-button"
-                disabled={loading || !canSubmit}
-                onClick={submitPayroll}
-              >
-                <FileText size={17} />
-                Submit for Approval
-              </button>
-              <button
-                className="tw-primary-button"
-                disabled={loading || !canApprove}
-                onClick={approvePayroll}
-              >
-                <LockKeyhole size={17} />
-                Admin Approve
-              </button>
-            </div>
-          </section>
           <section className="tw-panel tw-help-panel">
-            <div className="tw-help-icon">
-              <AlertCircle size={20} />
-            </div>
-            <div>
-              <strong>Payroll Information</strong>
-              <p>
-                After admin approval, only that employee's payroll is locked.
-                  Other employees can still be processed in the same month.
-              </p>
+            <div className="tw-help-icon"><CircleCheck size={20} /></div>
+            <div><strong>Direct Payroll Processing</strong>
+              <p>Save attendance and calculate salary. Successful calculation finalizes this employee's payroll immediately and makes the payslip available. Verify all inputs before calculating; finalized payroll is locked.</p>
             </div>
           </section>
         </div>
       </div>
-      {/* PAYROLL REVIEW */}
+      {/* PAYROLL SUMMARY */}
       <section className="tw-panel tw-review-panel">
         <div className="tw-section-title tw-review-heading">
           <div>
             <div className="tw-section-number">
               PAYROLL REGISTER
             </div>
-            <h2>Employee Payroll Review</h2>
+            <h2>Employee Payroll Summary</h2>
             <p>
               Salary and statutory deduction breakdown
             </p>
