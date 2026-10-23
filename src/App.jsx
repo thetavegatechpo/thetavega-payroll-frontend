@@ -1,5 +1,4 @@
 import SiteMaster from "./SiteMaster.jsx";
-import PayrollOperations from "./PayrollOperations.jsx";
 import CompanySettings from "./CompanySettings.jsx";
 import UserManagement from "./UserManagement.jsx";
 import Payslips from "./Payslips.jsx";
@@ -8,7 +7,7 @@ import logo from "./assets/logo.png";
 
 import PayrollPolicy from "./PayrollPolicy.jsx";
 
-
+import SiteAttendanceReview from "./SiteAttendanceReview";
 
 import PayrollWorkspace from "./PayrollWorkspace.jsx";
 
@@ -518,6 +517,28 @@ function Employees() {
   const [refresh, setRefresh] = useState(0);
 
   const [selected, setSelected] = useState(null);
+  const [pwdEmployee,setPwdEmployee]=useState(null);
+  const [pwdConfigured,setPwdConfigured]=useState(null);
+  const [pwdValue,setPwdValue]=useState('');
+  const [pwdConfirm,setPwdConfirm]=useState('');
+  const [pwdBusy,setPwdBusy]=useState(false);
+  const [pwdError,setPwdError]=useState('');
+  async function openAppPassword(employee){
+    setPwdEmployee(employee);setPwdConfigured(null);setPwdValue('');setPwdConfirm('');setPwdError('');
+    try {const {data}=await api.get(`/employees/${employee._id}/mobile-password`);setPwdConfigured(data.configured)}
+    catch(e){setPwdError(errorText(e))}
+  }
+  async function saveAppPassword(e){
+    e.preventDefault();
+    if(pwdValue.length<10 || pwdValue.length>128){setPwdError('Password must be 10-128 characters');return}
+    if(pwdValue!==pwdConfirm){setPwdError('Passwords do not match');return}
+    setPwdBusy(true);setPwdError('');
+    try {
+      await api.put(`/employees/${pwdEmployee._id}/mobile-password`,{password:pwdValue});
+      setPwdEmployee(null);setPwdValue('');setPwdConfirm('');setMsg('Employee app password saved; prior mobile sessions revoked');
+    }catch(e){setPwdError(errorText(e))}finally{setPwdBusy(false)}
+  }
+
 
 
 
@@ -833,7 +854,7 @@ function Employees() {
 
             <div className="tv-emp-contact"><div title={e.email||""}><FileText size={13}/>{e.email||"Email not provided"}</div><div><Users size={13}/>{e.mobile||"Mobile not provided"}</div></div>
 
-            <div className="tv-emp-actions"><button onClick={()=>openEdit(e)}>Edit</button><button className="tv-emp-primary" onClick={()=>setSelected(e)}>View Profile</button></div>
+            <div className="tv-emp-actions"><button onClick={()=>openEdit(e)}>Edit</button><button className="tv-emp-primary" onClick={()=>setSelected(e)}>View Profile</button><button style={{gridColumn:"1 / -1"}} onClick={()=>openAppPassword(e)}>Set / Reset App Password</button></div>
 
           </article>)}</div>
 
@@ -843,7 +864,7 @@ function Employees() {
 
       </> : <div className="tv-emp-list"><table><thead><tr><th>Employee</th><th>ID</th><th>Department</th><th>Designation</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead><tbody>
 
-        {visible.map(e=><tr key={e._id}><td><b>{e.firstName} {e.lastName}</b><small>{e.email||"—"}</small></td><td>{e.employeeCode}</td><td>{e.department?.name||"—"}</td><td>{e.designation?.name||"—"}</td><td>{e.joiningDate?.slice(0,10)||"—"}</td><td><span className={"status "+(e.status==="ACTIVE"?"active":"inactive")}>{e.status}</span></td><td><div className="actions"><button className="outline" onClick={()=>openEdit(e)}><Pencil size={14}/>Edit</button><button className="text-btn" onClick={()=>setSelected(e)}>View</button></div></td></tr>)}
+        {visible.map(e=><tr key={e._id}><td><b>{e.firstName} {e.lastName}</b><small>{e.email||"—"}</small></td><td>{e.employeeCode}</td><td>{e.department?.name||"—"}</td><td>{e.designation?.name||"—"}</td><td>{e.joiningDate?.slice(0,10)||"—"}</td><td><span className={"status "+(e.status==="ACTIVE"?"active":"inactive")}>{e.status}</span></td><td><div className="actions"><button className="outline" onClick={()=>openEdit(e)}><Pencil size={14}/>Edit</button><button className="text-btn" onClick={()=>setSelected(e)}>View</button><button className="outline" onClick={()=>openAppPassword(e)}>App Password</button></div></td></tr>)}
 
         {!visible.length && <tr><td colSpan="7" className="empty">No employees found</td></tr>}
 
@@ -851,6 +872,23 @@ function Employees() {
 
       <div className="tv-emp-pagination"><span>Showing {visible.length} employees on page {page} · {total} total matching status/search</span><div><button disabled={page<=1} onClick={()=>setPage(v=>v-1)}>Previous</button><button disabled={page*40>=total} onClick={()=>setPage(v=>v+1)}>Next</button></div></div>
 
+      {pwdEmployee && <div className="modal-backdrop" onClick={()=>{if(!pwdBusy)setPwdEmployee(null)}}>
+        <div className="modal compact" onClick={e=>e.stopPropagation()}>
+          <div className="modal-head"><div><span className="eyebrow">ATTENDANCE APP ACCESS</span><h2>Employee App Password</h2></div><button className="icon-btn" disabled={pwdBusy} onClick={()=>setPwdEmployee(null)}><X/></button></div>
+          <p><strong>{pwdEmployee.employeeCode}</strong> — {pwdEmployee.firstName} {pwdEmployee.lastName}</p>
+          <p>Mobile: {pwdEmployee.mobile || 'Not configured'}</p>
+          <p>Status: {pwdConfigured===null?'Checking…':pwdConfigured?'Password configured':'Password not configured'}</p>
+          <form onSubmit={saveAppPassword} autoComplete="off">
+            <div className="form-grid">
+              <label className="wide">New app password<input type="password" autoComplete="new-password" minLength={10} maxLength={128} required value={pwdValue} onChange={e=>setPwdValue(e.target.value)}/></label>
+              <label className="wide">Confirm password<input type="password" autoComplete="new-password" minLength={10} maxLength={128} required value={pwdConfirm} onChange={e=>setPwdConfirm(e.target.value)}/></label>
+            </div>
+            <p style={{fontSize:12,color:'#718391'}}>The employee must change this temporary password. Resetting it signs out existing mobile sessions. Never share passwords in chat or email.</p>
+            <Notice message={pwdError}/>
+            <div className="modal-actions"><button type="button" className="outline" disabled={pwdBusy} onClick={()=>setPwdEmployee(null)}>Cancel</button><button className="primary" disabled={pwdBusy || pwdConfigured===null}>{pwdBusy?'Saving…':'Save App Password'}</button></div>
+          </form>
+        </div>
+      </div>}
       {selected && <div className="modal-backdrop" onClick={()=>setSelected(null)}><div className="modal compact" onClick={e=>e.stopPropagation()}>
 
         <div className="modal-head"><div><span className="tv-emp-overline">Employee profile</span><h2>{selected.firstName} {selected.lastName}</h2></div><button className="icon-btn" onClick={()=>setSelected(null)}><X/></button></div>
@@ -1388,4 +1426,4 @@ function Settings(){const[rows,setRows]=useState([]),[values,setValues]=useState
 
 
 
-export default function App(){const[user,setUser]=useState(getUser);const navigate=useNavigate();function logout(){localStorage.removeItem("tv_payroll_token");localStorage.removeItem("tv_payroll_user");setUser(null);navigate("/login")}return <Routes><Route path="/login" element={user?<Navigate to="/"/>:<Login onLogin={setUser}/>}/><Route path="/*" element={!user?<Navigate to="/login"/>:<Shell user={user} onLogout={logout}><Routes><Route path="/" element={<Dashboard/>}/><Route path="/employees" element={<Employees/>}/><Route path="/departments" element={<Master type="departments"/>}/><Route path="/sites" element={<SiteMaster/>}/><Route path="/designations" element={<Master type="designations"/>}/><Route path="/salary-components" element={<Components/>}/><Route path="/salary-structures" element={<SalaryStructures/>}/><Route path="/payroll" element={<PayrollWorkspace/>}/><Route path="/payroll-operations" element={<Navigate to="/salary-structures" replace/>}/><Route path="/site-attendance" element={<PayrollOperations initialTab="operations" mode="site"/>}/><Route path="/payslips" element={<Payslips/>}/><Route path="/payroll-policy" element={<PayrollPolicy/>}/><Route path="/rules" element={<Rules/>}/><Route path="/settings" element={<CompanySettings/>}/><Route path="/users-access" element={["ADMIN", "SUPER_ADMIN"].includes(user?.role)?<UserManagement/>:<Navigate to="/"/>}/><Route path="*" element={<Navigate to="/"/>}/></Routes></Shell>}/></Routes>}
+export default function App(){const[user,setUser]=useState(getUser);const navigate=useNavigate();function logout(){localStorage.removeItem("tv_payroll_token");localStorage.removeItem("tv_payroll_user");setUser(null);navigate("/login")}return <Routes><Route path="/login" element={user?<Navigate to="/"/>:<Login onLogin={setUser}/>}/><Route path="/*" element={!user?<Navigate to="/login"/>:<Shell user={user} onLogout={logout}><Routes><Route path="/" element={<Dashboard/>}/><Route path="/employees" element={<Employees/>}/><Route path="/departments" element={<Master type="departments"/>}/><Route path="/sites" element={<SiteMaster/>}/><Route path="/designations" element={<Master type="designations"/>}/><Route path="/salary-components" element={<Components/>}/><Route path="/salary-structures" element={<SalaryStructures/>}/><Route path="/payroll" element={<PayrollWorkspace/>}/><Route path="/payroll-operations" element={<Navigate to="/salary-structures" replace/>}/><Route path="/site-attendance" element={<SiteAttendanceReview/>}/><Route path="/payslips" element={<Payslips/>}/><Route path="/payroll-policy" element={<PayrollPolicy/>}/><Route path="/rules" element={<Rules/>}/><Route path="/settings" element={<CompanySettings/>}/><Route path="/users-access" element={["ADMIN", "SUPER_ADMIN"].includes(user?.role)?<UserManagement/>:<Navigate to="/"/>}/><Route path="*" element={<Navigate to="/"/>}/></Routes></Shell>}/></Routes>}

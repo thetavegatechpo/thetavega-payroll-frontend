@@ -1,9 +1,10 @@
 import React,{useEffect,useState} from 'react';
+import SiteAttendanceReview from './SiteAttendanceReview';
 import {api,errorText} from './api';
 const types=['TA_FIXED','TA_ACTUAL','OUTSTATION','SITE_LATE','EARLY_LEAVE','OVERTIME'];
 const money=p=>(Number(p||0)/100).toLocaleString('en-IN',{style:'currency',currency:'INR'});
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
-export default function PayrollOperations({initialTab="insurance",mode="payroll"}){
+function LegacyPayrollOperations({initialTab="insurance",mode="payroll"}){
  const [tab,setTab]=useState(initialTab),[employees,setEmployees]=useState([]),[rows,setRows]=useState([]),[advances,setAdvances]=useState([]),[sites,setSites]=useState([]),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const [f,setF]=useState({employee:'',amount:'',date:today(),effectiveFrom:today(),type:'TA_ACTUAL',year:new Date().getFullYear(),month:new Date().getMonth()+1,advance:'',hours:'',tripId:'',site:'',siteId:'',department:'',description:'',checkInLatitude:'',checkInLongitude:'',checkOutLatitude:'',checkOutLongitude:'',scheduledTime:'',checkIn:'',checkOut:'',reason:'',reference:''});
  const update=(key,value)=>setF(v=>({...v,[key]:value}));
@@ -36,4 +37,8 @@ export default function PayrollOperations({initialTab="insurance",mode="payroll"
  {error&&<p style={{color:'#c62828'}}>{error}</p>}{message&&<p>{message}</p>}</section>
  <section className='card' style={{padding:20,overflowX:'auto'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><h3>Records</h3><button type='button' onClick={csv}>Export CSV</button></div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{columns.map(k=><th key={k} style={{textAlign:'left',padding:9}}>{k.replace(/([A-Z])/g,' $1')}</th>)}<th>Actions</th></tr></thead><tbody>{rows.map(r=><tr key={r._id}>{columns.map(k=><td key={k} style={{padding:9,borderTop:'1px solid #ddd'}}>{display(r,k)}</td>)}<td style={{whiteSpace:'nowrap'}}>{tab==='advances'&&!r.paid&&<button disabled={busy} onClick={()=>run(()=>api.post(`/payroll-operations/advances/${r._id}/pay`))}>Mark paid</button>}{['recoveries','operations'].includes(tab)&&r.status==='PENDING'&&<><button disabled={busy} onClick={()=>decide(r._id,'APPROVED')}>Approve</button><button disabled={busy} onClick={()=>decide(r._id,'REJECTED')}>Reject</button></>}{((tab==='operations'||tab==='recoveries')&&r.status==='PENDING'||tab==='advances'&&!r.paid||tab==='insurance'&&r.active)&&<button disabled={busy} onClick={()=>{if(window.confirm('Delete this pending record?'))run(()=>api.delete(`/payroll-operations/${endpoints[tab]}/${r._id}`))}}>Delete</button>}{tab==='operations'&&r.status==='APPROVED' &&r.type.startsWith('TA_')&&!r.paid&&<button disabled={busy} onClick={()=>{const reference=window.prompt('Payment reference');if(reference)run(()=>api.post(`/payroll-operations/operations/${r._id}/pay`,{reference}))}}>Mark TA paid</button>}</td></tr>)}</tbody></table>{!rows.length&&<p>No records yet.</p>}</section>
  </div>
+}
+
+export default function PayrollOperations(props) {
+  return props.mode === "site" ? <SiteAttendanceReview /> : <LegacyPayrollOperations {...props} />;
 }
